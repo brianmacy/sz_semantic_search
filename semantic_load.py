@@ -16,7 +16,7 @@ import threading
 
 import senzing_core
 
-#from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 from fast_sentence_transformers import FastSentenceTransformer as SentenceTransformer
 
 import concurrent
@@ -24,8 +24,11 @@ import concurrent
 global records_left
 data = threading.local()
 
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cpu") #, device="cuda")
+model = SentenceTransformer(
+    "sentence-transformers/all-MiniLM-L6-v2", device="cpu"
+)  # , device="cuda")
 print(f"Device: {model.device}")
+
 
 def get_postgresql_url(engine_config):
     # BEMIMP currently doesn't support database clustering
@@ -67,32 +70,38 @@ def get_postgresql_url(engine_config):
 
     return senzing_database_url
 
+
 def process_name(cursor, data_source, record_id, val):
     if not val:
         return
 
     try:
         embedding = model.encode(val)
-        #print(embedding.shape) ## this defines the size of the vector
-        #cursor.execute("INSERT INTO NAME_SEARCH_EMB (DATA_SOURCE, RECORD_ID, EMBEDDING) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",  (data_source, record_id, embedding))
+        # print(embedding.shape) ## this defines the size of the vector
+        # cursor.execute("INSERT INTO NAME_SEARCH_EMB (DATA_SOURCE, RECORD_ID, EMBEDDING) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",  (data_source, record_id, embedding))
     except Exception as ex:
         traceback.print_exc()
         print(ex)
         print("Make sure the table exists and pgvector is enabled")
         print("CREATE EXTENSION vector")
-        print("CREATE TABLE NAME_SEARCH_EMB (DATA_SOURCE TEXT, RECORD_ID TEXT, EMBEDDING VECTOR(384))");
-        print("CREATE INDEX ON NAME_SEARCH_EMB USING hnsw (EMBEDDING vector_cosine_ops)");
+        print(
+            "CREATE TABLE NAME_SEARCH_EMB (DATA_SOURCE TEXT, RECORD_ID TEXT, EMBEDDING VECTOR(384))"
+        )
+        print(
+            "CREATE INDEX ON NAME_SEARCH_EMB USING hnsw (EMBEDDING vector_cosine_ops)"
+        )
         print(f"val {val}")
         raise
 
 
 def process_record_for_embed(cursor, data_source, record_id, record):
-    for key,val in record.items():
+    for key, val in record.items():
         if isinstance(val, dict):
             process_record_for_embed(cursor, data_source, record_id, val)
         else:
-            if key.upper().endswith('NAME_ORG') or key.upper().endswith('NAME_FULL'):
+            if key.upper().endswith("NAME_ORG") or key.upper().endswith("NAME_FULL"):
                 process_name(cursor, data_source, record_id, val)
+
 
 def get_connection(url):
     print(f"Connecting with {url}")
@@ -101,18 +110,19 @@ def get_connection(url):
     register_vector(conn)
     return conn
 
+
 def process_record(url, line):
     global records_left
     try:
-        if not hasattr(data, 'conn'):
+        if not hasattr(data, "conn"):
             data.conn = get_connection(url)
 
-        #print(f"data.conn {data.conn}")
+        # print(f"data.conn {data.conn}")
         cur = data.conn.cursor()
         rec = json.loads(line)
-        data_source = rec['DATA_SOURCE']
-        record_id = rec['RECORD_ID']
-        #engine.add_record(data_source, record_id, line)
+        data_source = rec["DATA_SOURCE"]
+        record_id = rec["RECORD_ID"]
+        # engine.add_record(data_source, record_id, line)
         process_record_for_embed(cur, data_source, record_id, rec)
         records_left -= 1
         cur.close()
@@ -177,7 +187,7 @@ try:
                 count += 1
                 records_left += 1
                 executor.submit(process_record, url, line)
-                if count%10000 == 0:
+                if count % 10000 == 0:
                     print(f"Processed {count}...")
         executor.shutdown(wait=True, cancel_futures=False)
 except Exception as ex:

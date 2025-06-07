@@ -24,13 +24,16 @@ from senzing import SzEngineFlags, SzError
 
 INTERVAL = 1000
 
-#from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 from fast_sentence_transformers import FastSentenceTransformer as SentenceTransformer
 
 data = threading.local()
 
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cpu") #, device="cuda")
+model = SentenceTransformer(
+    "sentence-transformers/all-MiniLM-L6-v2", device="cpu"
+)  # , device="cuda")
 print(f"Device: {model.device}")
+
 
 def get_postgresql_url(engine_config):
     # BEMIMP currently doesn't support database clustering
@@ -72,6 +75,7 @@ def get_postgresql_url(engine_config):
 
     return senzing_database_url
 
+
 def process_name(cursor, val):
     if not val:
         return []
@@ -79,21 +83,32 @@ def process_name(cursor, val):
     try:
         ret = []
         embedding = model.encode(val)
-        #print(embedding.shape) ## this defines the size of the vector
-        #cursor.execute("SELECT DATA_SOURCE, RECORD_ID FROM NAME_SEARCH_EMB ORDER BY EMBEDDING <=> %s LIMIT 100",  (embedding,))
-        cursor.execute("SELECT DATA_SOURCE, RECORD_ID, 1-(EMBEDDING <=> %s) FROM NAME_SEARCH_EMB WHERE 1-(EMBEDDING <=> %s) > 0.8 ORDER BY EMBEDDING <=> %s ASC LIMIT 100",  (embedding,embedding,embedding,))
+        # print(embedding.shape) ## this defines the size of the vector
+        # cursor.execute("SELECT DATA_SOURCE, RECORD_ID FROM NAME_SEARCH_EMB ORDER BY EMBEDDING <=> %s LIMIT 100",  (embedding,))
+        cursor.execute(
+            "SELECT DATA_SOURCE, RECORD_ID, 1-(EMBEDDING <=> %s) FROM NAME_SEARCH_EMB WHERE 1-(EMBEDDING <=> %s) > 0.8 ORDER BY EMBEDDING <=> %s ASC LIMIT 100",
+            (
+                embedding,
+                embedding,
+                embedding,
+            ),
+        )
         for row in cursor:
-            #print(f"Got {row[0]} : {row[1]} : {row[2]}")
-            ret.append([row[0],row[1]])
-        #print(ret)
+            # print(f"Got {row[0]} : {row[1]} : {row[2]}")
+            ret.append([row[0], row[1]])
+        # print(ret)
         return ret
     except Exception as ex:
         traceback.print_exc()
         print(ex)
         print("Make sure the table exists and pgvector is enabled")
         print("CREATE EXTENSION vector")
-        print("CREATE TABLE NAME_SEARCH_EMB (DATA_SOURCE TEXT, RECORD_ID TEXT, EMBEDDING VECTOR(384))");
-        print("CREATE INDEX ON NAME_SEARCH_EMB USING hnsw (EMBEDDING vector_cosine_ops)");
+        print(
+            "CREATE TABLE NAME_SEARCH_EMB (DATA_SOURCE TEXT, RECORD_ID TEXT, EMBEDDING VECTOR(384))"
+        )
+        print(
+            "CREATE INDEX ON NAME_SEARCH_EMB USING hnsw (EMBEDDING vector_cosine_ops)"
+        )
         print(f"val {val}")
         raise
 
@@ -101,13 +116,14 @@ def process_name(cursor, val):
 def process_record_for_embed(cursor, record):
     found_records = []
 
-    for key,val in record.items():
+    for key, val in record.items():
         if isinstance(val, dict):
             found_records.extend(process_record_for_embed(cursor, val))
         else:
-            if key.upper().endswith('NAME_ORG') or key.upper().endswith('NAME_FULL'):
+            if key.upper().endswith("NAME_ORG") or key.upper().endswith("NAME_FULL"):
                 found_records.extend(process_name(cursor, val))
     return found_records
+
 
 def get_connection(url):
     print(f"Connecting with {url}")
@@ -120,20 +136,22 @@ def get_connection(url):
 def process_line(engine, line, url):
 
     try:
-        if not hasattr(data, 'conn'):
+        if not hasattr(data, "conn"):
             data.conn = get_connection(url)
         cursor = data.conn.cursor()
 
         record = json.loads(line.encode())
         startTime = timer()
-       
+
         forced_records = process_record_for_embed(cursor, record)
         if forced_records:
             forced_candidates = dict()
             forced_candidates["RECORDS"] = []
-            for dsrc,id in forced_records:
-                forced_candidates["RECORDS"].append({"DATA_SOURCE":dsrc,"RECORD_ID":id})
-            #print(forced_candidates)
+            for dsrc, id in forced_records:
+                forced_candidates["RECORDS"].append(
+                    {"DATA_SOURCE": dsrc, "RECORD_ID": id}
+                )
+            # print(forced_candidates)
             record["_FORCED_CANDIDATES"] = forced_candidates
 
         response = None
@@ -233,7 +251,9 @@ try:
                             response = result[2]
                             if response:
                                 resp = json.loads(response)
-                                total_entities_returned += len(resp["RESOLVED_ENTITIES"])
+                                total_entities_returned += len(
+                                    resp["RESOLVED_ENTITIES"]
+                                )
 
                         numLines += 1
                         if numLines % INTERVAL == 0:
