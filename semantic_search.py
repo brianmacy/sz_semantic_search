@@ -30,8 +30,10 @@ from fast_sentence_transformers import FastSentenceTransformer as SentenceTransf
 data = threading.local()
 
 model = SentenceTransformer(
-    "sentence-transformers/all-MiniLM-L6-v2", device="cpu"
-)  # , device="cuda")
+    model_name_or_path="sentence-transformers/all-MiniLM-L6-v2",
+    device="cuda",
+    verbose=False,
+)
 print(f"Device: {model.device}")
 
 
@@ -83,8 +85,6 @@ def process_name(cursor, val):
     try:
         ret = []
         embedding = model.encode(val)
-        # print(embedding.shape) ## this defines the size of the vector
-        # cursor.execute("SELECT DATA_SOURCE, RECORD_ID FROM NAME_SEARCH_EMB ORDER BY EMBEDDING <=> %s LIMIT 100",  (embedding,))
         cursor.execute(
             "SELECT DATA_SOURCE, RECORD_ID, 1-(EMBEDDING <=> %s) FROM NAME_SEARCH_EMB WHERE 1-(EMBEDDING <=> %s) > 0.8 ORDER BY EMBEDDING <=> %s ASC LIMIT 100",
             (
