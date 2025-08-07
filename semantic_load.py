@@ -78,7 +78,7 @@ def process_name(cursor, data_source, record_id, val):
     try:
         embedding = model.encode(val)
         # print(embedding.shape) ## this defines the size of the vector
-        # cursor.execute("INSERT INTO NAME_SEARCH_EMB (DATA_SOURCE, RECORD_ID, EMBEDDING) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",  (data_source, record_id, embedding))
+        cursor.execute("INSERT INTO NAME_SEARCH_EMB (DATA_SOURCE, RECORD_ID, EMBEDDING) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",  (data_source, record_id, embedding))
     except Exception as ex:
         traceback.print_exc()
         print(ex)
