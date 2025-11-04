@@ -188,6 +188,10 @@ If migrating from the old approach:
    - Data must be reloaded with the new `semantic_load.py`
    - Old data doesn't have SEMANTIC_EMBEDDING fields
    ```bash
+   # Test with included sample first
+   ./semantic_load.py test_icij_sample.json
+
+   # Then reload your own data
    ./semantic_load.py your_data.json
    ```
 

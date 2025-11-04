@@ -85,6 +85,14 @@ pip install \
 - **GPU**: NVIDIA with CUDA for 3-5x faster embedding generation
 - **Docker**: For containerized deployment
 
+### Sample Data
+
+The repository includes `test_icij_sample.json` - a 1,000 record sample from ICIJ data for immediate testing:
+- 676KB (git-friendly size)
+- Mix of PERSON, ORGANIZATION, and ADDRESS records
+- Includes international names, transliterations, and business names
+- Perfect for validating the setup and exploring semantic search
+
 ## 🚀 Quick Start
 
 ### 1. Setup Environment
@@ -122,12 +130,20 @@ export SENZING_ENGINE_CONFIGURATION_JSON='{
 ### 4. Load Data
 
 ```bash
+# Load the included 1000-record sample
+./semantic_load.py test_icij_sample.json
+
+# Or load your own data
 ./semantic_load.py your_data.json
 ```
 
 ### 5. Search
 
 ```bash
+# Create a simple query
+echo '{"RECORD_ID": "search_001", "NAME_FULL": "John Smith"}' | ./semantic_search.py /dev/stdin
+
+# Or use a query file
 ./semantic_search.py your_queries.json
 ```
 

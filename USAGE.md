@@ -131,6 +131,10 @@ See [NAME_FORMATS.md](NAME_FORMATS.md) for detailed information on all supported
 ### Load Records with Embeddings
 
 ```bash
+# Load the included sample data (1000 records)
+./semantic_load.py test_icij_sample.json
+
+# Or load your own data
 ./semantic_load.py your_data.json
 ```
 
@@ -149,7 +153,7 @@ Sz will then:
 ### Options
 
 ```bash
-./semantic_load.py your_data.json -x  # Skip engine prime (faster startup)
+./semantic_load.py test_icij_sample.json -x  # Skip engine prime (faster startup)
 ./semantic_load.py your_data.json -t  # Enable debug tracing
 ```
 

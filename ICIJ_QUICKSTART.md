@@ -12,10 +12,10 @@ This guide will help you test the semantic search with ICIJ data using SQLite an
 ## Prerequisites
 
 - G2 build at `~/dev/G2/dev/build/dist`
-- ICIJ data at `~/open_dev/sz_semantic_search/test_icij.json`
+- ICIJ sample data: `test_icij_sample.json` (included in repo, 1000 records)
 - Python packages: `fast-sentence-transformers`, `orjson`
 
-## Quick Test (10,000 records)
+## Quick Test (1,000 records - included sample)
 
 ```bash
 cd ~/open_dev/sz_semantic_search
@@ -27,25 +27,24 @@ This will:
 2. ✓ Create SQLite database with G2 schema
 3. ✓ Setup vector tables with szvec extension
 4. ✓ Create NAME_SEM_KEY feature type
-5. ✓ Load first 10,000 ICIJ records with embeddings
+5. ✓ Load 1,000 ICIJ sample records with embeddings
 6. ✓ Generate 10 search queries
 7. ✓ Run semantic searches
 8. ✓ Show results and statistics
 
-**Expected time:** ~5-10 minutes for 10,000 records
+**Expected time:** ~2-3 minutes for 1,000 records
 
-## Full Test (All ~2M records)
+## Testing with Larger Datasets
 
-Edit `test_icij_sqlite.sh` and change:
-
-```bash
-TEST_RECORDS=0  # 0 = use all data
-```
-
-Then run:
+If you have a larger ICIJ dataset (e.g., `test_icij.json` with ~2M records):
 
 ```bash
-./test_icij_sqlite.sh
+# Use custom dataset
+ICIJ_DATA="$HOME/open_dev/sz_semantic_search/test_icij.json" ./test_icij_sqlite.sh
+
+# Or edit test_icij_sqlite.sh and change:
+ICIJ_DATA="$PROJECT_DIR/test_icij.json"
+TEST_RECORDS=10000  # Or 0 for all records
 ```
 
 **Expected time:** ~2-4 hours for full dataset (depends on CPU/GPU)
@@ -55,7 +54,7 @@ Then run:
 ```
 ~/open_dev/sz_semantic_search/test_db/
 ├── icij_test.db           # SQLite database with G2 schema + vectors
-├── icij_subset.json       # First 10k records (if TEST_RECORDS > 0)
+├── icij_subset.json       # Subset of records (if TEST_RECORDS > 0)
 └── search_queries.json    # Generated search queries
 ```
 

@@ -17,11 +17,11 @@ G2_BUILD="$G2_DIR/build/dist"
 SZVEC_PATH="$G2_BUILD/lib/szvec.so"
 DB_DIR="$PROJECT_DIR/test_db"
 DB_PATH="$DB_DIR/icij_test.db"
-ICIJ_DATA="$PROJECT_DIR/test_icij.json"
+ICIJ_DATA="$PROJECT_DIR/test_icij_sample.json"
 
 # Test data size (use first N records for testing)
-# Set to 0 to use all data
-TEST_RECORDS=10000
+# Set to 0 to use all data, or specify custom file with ICIJ_DATA env var
+TEST_RECORDS=1000
 
 echo "Configuration:"
 echo "  Project Dir: $PROJECT_DIR"
