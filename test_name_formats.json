@@ -1,0 +1,6 @@
+{"DATA_SOURCE": "TEST", "RECORD_ID": "001", "NAME_FULL": "John Smith", "PHONE_NUMBER": "555-1234"}
+{"DATA_SOURCE": "TEST", "RECORD_ID": "002", "NAME_FIRST": "Jane", "NAME_LAST": "Doe", "PHONE_NUMBER": "555-5678"}
+{"DATA_SOURCE": "TEST", "RECORD_ID": "003", "NAME_FIRST": "Robert", "NAME_MIDDLE": "James", "NAME_LAST": "Johnson", "EMAIL": "rjj@example.com"}
+{"DATA_SOURCE": "TEST", "RECORD_ID": "004", "NAME_ORG": "Acme Corporation", "PHONE_NUMBER": "555-9999"}
+{"DATA_SOURCE": "TEST", "RECORD_ID": "005", "NAME_FULL": "Mary Williams", "ADDRESS_LINE1": "123 Main St"}
+{"DATA_SOURCE": "TEST", "RECORD_ID": "006", "NAME_FIRST": "Michael", "NAME_LAST": "Brown", "ADDRESS_CITY": "New York"}

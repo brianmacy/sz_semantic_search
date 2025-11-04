@@ -5,131 +5,93 @@ import orjson as json
 import os
 import sys
 import traceback
-
-
-import uritools
-import psycopg2
-import pgvector
-from pgvector.psycopg2 import register_vector
 import threading
-
+import concurrent
 
 import senzing_core
 
-# from sentence_transformers import SentenceTransformer
-from fast_sentence_transformers import FastSentenceTransformer as SentenceTransformer
-
-import concurrent
+from sentence_transformers import SentenceTransformer
+# from fast_sentence_transformers import FastSentenceTransformer as SentenceTransformer
 
 global records_left
 data = threading.local()
 
 model = SentenceTransformer(
     "sentence-transformers/all-MiniLM-L6-v2", device="cpu"
-)  # , device="cuda")
+)
 print(f"Device: {model.device}")
 
 
-def get_postgresql_url(engine_config):
-    # BEMIMP currently doesn't support database clustering
-    config = json.loads(engine_config)
-    senzing_database_url = config["SQL"]["CONNECTION"]
+def add_embeddings_to_record(record):
+    """Add SEMANTIC_EMBEDDING and SEMANTIC_LABEL fields to record based on name fields."""
+    names_found = []
 
-    parsed = uritools.urisplit(senzing_database_url)
-    if "schema" in parsed.getquerydict():
-        # BEMIMP
-        print("Non-default schema not currently supported.")
-        sys.exit(-1)
+    def construct_name_from_parts(obj):
+        """Construct full name from NAME_FIRST, NAME_MIDDLE, NAME_LAST."""
+        parts = []
+        if "NAME_FIRST" in obj and obj["NAME_FIRST"]:
+            parts.append(obj["NAME_FIRST"])
+        if "NAME_MIDDLE" in obj and obj["NAME_MIDDLE"]:
+            parts.append(obj["NAME_MIDDLE"])
+        if "NAME_LAST" in obj and obj["NAME_LAST"]:
+            parts.append(obj["NAME_LAST"])
+        return " ".join(parts) if parts else None
 
-    if not parsed.port and len(parsed.path) <= 1:
-        # print("URI with DBi, reparsing modified URI")
-        # historically, postgresql URIs allow the DB to be after after a colon
-        # or part of the path
-        # actual PostgreSQL URIs aren't standard either though the python interface
-        # attempts to normalize it so we convert here
-        values = parsed.host.split(":")
-        host = values[0]
-        port = None
-        path = None
-        if len(values) > 2:
-            port = values[1]
-            path = "/" + values[2]
-        else:
-            path = "/" + values[1]
+    def extract_names(obj, path=""):
+        """Recursively extract name fields from record."""
+        if isinstance(obj, dict):
+            # Check for structured name (NAME_FIRST, NAME_MIDDLE, NAME_LAST)
+            constructed_name = construct_name_from_parts(obj)
+            if constructed_name:
+                names_found.append(("CONSTRUCTED_NAME", constructed_name))
 
-        mod_uri = uritools.uricompose(
-            scheme=parsed.scheme,
-            userinfo=parsed.userinfo,
-            host=host,
-            path=path,
-            port=port,
-            query=parsed.query,
-            fragment=parsed.fragment,
-        )
-        return mod_uri
+            # Also check for full name fields
+            for key, val in obj.items():
+                if isinstance(val, dict):
+                    extract_names(val, f"{path}.{key}" if path else key)
+                elif val and isinstance(val, str):
+                    key_upper = key.upper()
+                    if key_upper.endswith("NAME_ORG") or key_upper.endswith("NAME_FULL"):
+                        names_found.append((key, val))
 
-    return senzing_database_url
+    extract_names(record)
 
+    # Add embeddings for each name found
+    if names_found:
+        # Use the first name found (prioritize full names over constructed)
+        key, name_val = names_found[0]
+        embedding = model.encode(name_val)
 
-def process_name(cursor, data_source, record_id, val):
-    if not val:
-        return
+        # Convert numpy array to list for JSON serialization
+        # Use NAME_SEM_KEY for candidate generation (no scoring)
+        record["NAME_SEM_KEY_LABEL"] = name_val
+        record["NAME_SEM_KEY_EMBEDDING"] = json.dumps(embedding.tolist()).decode('utf-8')
 
-    try:
-        embedding = model.encode(val)
-        # print(embedding.shape) ## this defines the size of the vector
-        cursor.execute("INSERT INTO NAME_SEARCH_EMB (DATA_SOURCE, RECORD_ID, EMBEDDING) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",  (data_source, record_id, embedding))
-    except Exception as ex:
-        traceback.print_exc()
-        print(ex)
-        print("Make sure the table exists and pgvector is enabled")
-        print("CREATE EXTENSION vector")
-        print(
-            "CREATE TABLE NAME_SEARCH_EMB (DATA_SOURCE TEXT, RECORD_ID TEXT, EMBEDDING VECTOR(384))"
-        )
-        print(
-            "CREATE INDEX ON NAME_SEARCH_EMB USING hnsw (EMBEDDING vector_cosine_ops)"
-        )
-        print(f"val {val}")
-        raise
+    return record
 
 
-def process_record_for_embed(cursor, data_source, record_id, record):
-    for key, val in record.items():
-        if isinstance(val, dict):
-            process_record_for_embed(cursor, data_source, record_id, val)
-        else:
-            if key.upper().endswith("NAME_ORG") or key.upper().endswith("NAME_FULL"):
-                process_name(cursor, data_source, record_id, val)
-
-
-def get_connection(url):
-    print(f"Connecting with {url}")
-    conn = psycopg2.connect(url)
-    conn.autocommit = True
-    register_vector(conn)
-    return conn
-
-
-def process_record(url, line):
+def process_record(engine, line):
     global records_left
     try:
-        if not hasattr(data, "conn"):
-            data.conn = get_connection(url)
+        if not hasattr(data, "engine"):
+            data.engine = engine
 
-        # print(f"data.conn {data.conn}")
-        cur = data.conn.cursor()
         rec = json.loads(line)
         data_source = rec["DATA_SOURCE"]
         record_id = rec["RECORD_ID"]
-        # engine.add_record(data_source, record_id, line)
-        process_record_for_embed(cur, data_source, record_id, rec)
+
+        # Add embeddings directly to the record
+        rec = add_embeddings_to_record(rec)
+
+        # Add the record to Sz with embeddings
+        data.engine.add_record(data_source, record_id, json.dumps(rec))
+
         records_left -= 1
-        cur.close()
 
         if records_left % 10000 == 0:
             print(f"{records_left} records left...")
     except Exception as ex:
+        traceback.print_exc()
         print(ex)
 
 
@@ -171,8 +133,6 @@ factory = senzing_core.SzAbstractFactoryCore(
 )
 
 try:
-
-    url = get_postgresql_url(engine_config)
     engine = factory.create_engine()
     if not args.skipEnginePrime:
         engine.prime_engine()
@@ -186,7 +146,7 @@ try:
             for line in fp:
                 count += 1
                 records_left += 1
-                executor.submit(process_record, url, line)
+                executor.submit(process_record, engine, line)
                 if count % 10000 == 0:
                     print(f"Processed {count}...")
         executor.shutdown(wait=True, cancel_futures=False)

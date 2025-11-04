@@ -1,0 +1,45 @@
+# sz_configtool Commands to Create NAME_SEM_KEY Feature
+
+# These are the actual sz_configtool commands to manually create the NAME_SEM_KEY feature type
+# Based on SEMANTIC_VALUE (FTYPE_ID 99) configuration
+
+# Step 1: Get SEMANTIC_VALUE feature configuration
+getFeature SEMANTIC_VALUE jsonl
+
+# Returns (approximate based on CFG_FTYPE.data):
+# {"id": 99, "feature": "SEMANTIC_VALUE", "class": "OTHER", "behavior": "FF", "anonymize": "No", "candidates": "No", "standardize": "", "expression": "", "comparison": "SEMANTIC_SIMILARITY_COMP", "matchKey": "Yes", "version": 1, "elementList": [{"element": "EMBEDDING", "expressed": "No", "compared": "Yes", "derived": "Yes", "display": "No"}, {"element": "ALGORITHM", "expressed": "No", "compared": "Yes", "derived": "No", "display": "No"}, {"element": "LABEL", "expressed": "No", "compared": "No", "derived": "No", "display": "Yes"}]}
+
+# Step 2: Add NAME_SEM_KEY feature (modified from SEMANTIC_VALUE)
+# Changes:
+#  - Remove "id" field (system assigns new ID)
+#  - Change "feature" to "NAME_SEM_KEY"
+#  - Change "candidates" from "No" to "Yes" (enable candidate generation)
+#  - Remove "comparison" field (removes scoring plugin - THIS disables scoring)
+#  - Change "matchKey" from "Yes" to "No" (cosmetic - won't show in match keys)
+
+addFeature {"feature": "NAME_SEM_KEY", "class": "OTHER", "behavior": "FF", "anonymize": "No", "candidates": "Yes", "standardize": "", "expression": "", "matchKey": "No", "version": 1, "elementList": [{"element": "EMBEDDING", "expressed": "No", "compared": "No", "derived": "Yes", "display": "No"}, {"element": "ALGORITHM", "expressed": "No", "compared": "No", "derived": "No", "display": "No"}, {"element": "LABEL", "expressed": "No", "compared": "No", "derived": "No", "display": "Yes"}]}
+
+# Step 3: Add attribute mappings
+# Map JSON fields to feature type
+
+addAttribute {"attribute": "NAME_SEM_KEY_EMBEDDING", "class": "IDENTIFIER", "feature": "NAME_SEM_KEY", "element": "EMBEDDING", "required": "Yes", "default": "", "advanced": "No", "internal": "No"}
+
+addAttribute {"attribute": "NAME_SEM_KEY_LABEL", "class": "IDENTIFIER", "feature": "NAME_SEM_KEY", "element": "LABEL", "required": "Yes", "default": "", "advanced": "No", "internal": "No"}
+
+addAttribute {"attribute": "NAME_SEM_KEY_ALGORITHM", "class": "IDENTIFIER", "feature": "NAME_SEM_KEY", "element": "ALGORITHM", "required": "No", "default": "", "advanced": "Yes", "internal": "No"}
+
+# Step 4: Save configuration
+save
+
+# Step 5: Verify
+getFeature NAME_SEM_KEY jsonl
+listAttributes NAME_SEM_KEY
+
+# Notes:
+# - The "id" field is omitted in addFeature - Sz assigns the next available FTYPE_ID
+# - "candidates": "Yes" enables vector similarity search for candidate generation
+# - "comparison": "" (removed) - NO COMPARISON FUNCTION = NO SCORING (this is what disables scoring)
+# - Element "compared" changed from "Yes" to "No" - not compared since no comparison function
+# - "matchKey": "No" prevents showing in match keys (cosmetic, since no scoring anyway)
+# - Attribute class "IDENTIFIER" matches SEMANTIC_VALUE attributes
+# - EMBEDDING element uses DATA_TYPE='EMBEDDING' (defined in CFG_FELEM)

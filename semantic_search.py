@@ -6,7 +6,6 @@ import argparse
 import pathlib
 import orjson as json
 import itertools
-import uritools
 
 import sys
 import os
@@ -15,154 +14,84 @@ import threading
 from timeit import default_timer as timer
 import traceback
 
-import psycopg2
-import pgvector
-from pgvector.psycopg2 import register_vector
-
 import senzing_core
 from senzing import SzEngineFlags, SzError
 
-INTERVAL = 1000
+from sentence_transformers import SentenceTransformer
+# from fast_sentence_transformers import FastSentenceTransformer as SentenceTransformer
 
-# from sentence_transformers import SentenceTransformer
-from fast_sentence_transformers import FastSentenceTransformer as SentenceTransformer
+INTERVAL = 1000
 
 data = threading.local()
 
 model = SentenceTransformer(
     model_name_or_path="sentence-transformers/all-MiniLM-L6-v2",
-    device="cuda",
-    verbose=False,
+    device="cpu"
 )
 print(f"Device: {model.device}")
 
 
-def get_postgresql_url(engine_config):
-    # BEMIMP currently doesn't support database clustering
-    config = json.loads(engine_config)
-    senzing_database_url = config["SQL"]["CONNECTION"]
+def add_embeddings_to_record(record):
+    """Add SEMANTIC_EMBEDDING and SEMANTIC_LABEL fields to search record."""
+    names_found = []
 
-    parsed = uritools.urisplit(senzing_database_url)
-    if "schema" in parsed.getquerydict():
-        # BEMIMP
-        print("Non-default schema not currently supported.")
-        sys.exit(-1)
+    def construct_name_from_parts(obj):
+        """Construct full name from NAME_FIRST, NAME_MIDDLE, NAME_LAST."""
+        parts = []
+        if "NAME_FIRST" in obj and obj["NAME_FIRST"]:
+            parts.append(obj["NAME_FIRST"])
+        if "NAME_MIDDLE" in obj and obj["NAME_MIDDLE"]:
+            parts.append(obj["NAME_MIDDLE"])
+        if "NAME_LAST" in obj and obj["NAME_LAST"]:
+            parts.append(obj["NAME_LAST"])
+        return " ".join(parts) if parts else None
 
-    if not parsed.port and len(parsed.path) <= 1:
-        # print("URI with DBi, reparsing modified URI")
-        # historically, postgresql URIs allow the DB to be after after a colon
-        # or part of the path
-        # actual PostgreSQL URIs aren't standard either though the python interface
-        # attempts to normalize it so we convert here
-        values = parsed.host.split(":")
-        host = values[0]
-        port = None
-        path = None
-        if len(values) > 2:
-            port = values[1]
-            path = "/" + values[2]
-        else:
-            path = "/" + values[1]
+    def extract_names(obj, path=""):
+        """Recursively extract name fields from record."""
+        if isinstance(obj, dict):
+            # Check for structured name (NAME_FIRST, NAME_MIDDLE, NAME_LAST)
+            constructed_name = construct_name_from_parts(obj)
+            if constructed_name:
+                names_found.append(("CONSTRUCTED_NAME", constructed_name))
 
-        mod_uri = uritools.uricompose(
-            scheme=parsed.scheme,
-            userinfo=parsed.userinfo,
-            host=host,
-            path=path,
-            port=port,
-            query=parsed.query,
-            fragment=parsed.fragment,
-        )
-        return mod_uri
+            # Also check for full name fields
+            for key, val in obj.items():
+                if isinstance(val, dict):
+                    extract_names(val, f"{path}.{key}" if path else key)
+                elif val and isinstance(val, str):
+                    key_upper = key.upper()
+                    if key_upper.endswith("NAME_ORG") or key_upper.endswith("NAME_FULL"):
+                        names_found.append((key, val))
 
-    return senzing_database_url
+    extract_names(record)
+
+    # Add embeddings for each name found
+    if names_found:
+        # Use the first name found (prioritize full names over constructed)
+        key, name_val = names_found[0]
+        embedding = model.encode(name_val)
+
+        # Convert numpy array to list for JSON serialization
+        # Use NAME_SEM_KEY for candidate generation (no scoring)
+        record["NAME_SEM_KEY_LABEL"] = name_val
+        record["NAME_SEM_KEY_EMBEDDING"] = json.dumps(embedding.tolist()).decode('utf-8')
+
+    return record
 
 
-def process_name(cursor, val):
-    if not val:
-        return []
-
+def process_line(engine, line):
     try:
-        ret = []
-        embedding = model.encode(val)
-        cursor.execute(
-            "SELECT DATA_SOURCE, RECORD_ID, 1-(EMBEDDING <=> %s) FROM NAME_SEARCH_EMB WHERE 1-(EMBEDDING <=> %s) > 0.8 ORDER BY EMBEDDING <=> %s ASC LIMIT 100",
-            (
-                embedding,
-                embedding,
-                embedding,
-            ),
-        )
-        for row in cursor:
-            # print(f"Got {row[0]} : {row[1]} : {row[2]}")
-            ret.append([row[0], row[1]])
-        # print(ret)
-        return ret
-    except Exception as ex:
-        traceback.print_exc()
-        print(ex)
-        print("Make sure the table exists and pgvector is enabled")
-        print("CREATE EXTENSION vector")
-        print(
-            "CREATE TABLE NAME_SEARCH_EMB (DATA_SOURCE TEXT, RECORD_ID TEXT, EMBEDDING VECTOR(384))"
-        )
-        print(
-            "CREATE INDEX ON NAME_SEARCH_EMB USING hnsw (EMBEDDING vector_cosine_ops)"
-        )
-        print(f"val {val}")
-        raise
-
-
-def process_record_for_embed(cursor, record):
-    found_records = []
-
-    for key, val in record.items():
-        if isinstance(val, dict):
-            found_records.extend(process_record_for_embed(cursor, val))
-        else:
-            if key.upper().endswith("NAME_ORG") or key.upper().endswith("NAME_FULL"):
-                found_records.extend(process_name(cursor, val))
-    return found_records
-
-
-def get_connection(url):
-    print(f"Connecting with {url}")
-    conn = psycopg2.connect(url)
-    conn.autocommit = True
-    register_vector(conn)
-    return conn
-
-
-def process_line(engine, line, url):
-
-    try:
-        if not hasattr(data, "conn"):
-            data.conn = get_connection(url)
-        cursor = data.conn.cursor()
-
         record = json.loads(line.encode())
         startTime = timer()
 
-        forced_records = process_record_for_embed(cursor, record)
-        if forced_records:
-            forced_candidates = dict()
-            forced_candidates["RECORDS"] = []
-            for dsrc, id in forced_records:
-                forced_candidates["RECORDS"].append(
-                    {"DATA_SOURCE": dsrc, "RECORD_ID": id}
-                )
-            # print(forced_candidates)
-            record["_FORCED_CANDIDATES"] = forced_candidates
+        # Add embeddings directly to the search record
+        record = add_embeddings_to_record(record)
 
+        # Let Sz handle the semantic matching internally
         response = None
         response = engine.search_by_attributes(
             json.dumps(record), SzEngineFlags.SZ_SEARCH_BY_ATTRIBUTES_MINIMAL_ALL
         )
-        # engine.searchByAttributes( line, response, SzEngineFlags.SZ_SEARCH_INCLUDE_FEATURE_SCORES )
-        # engine.searchByAttributes( line, response, SzEngineFlags.SZ_ENTITY_INCLUDE_RECORD_DATA )
-        # engine.searchByAttributes( line, response, SzEngineFlags.SZ_SEARCH_INCLUDE_FEATURE_SCORES | SzEngineFlags.SZ_ENTITY_INCLUDE_RECORD_DATA )
-        # engine.searchByAttributes( line, response, SzEngineFlags.SZ_SEARCH_INCLUDE_FEATURE_SCORES | SzEngineFlags.SZ_ENTITY_INCLUDE_RECORD_DATA | SzEngineFlags.SZ_ENTITY_INCLUDE_RECORD_JSON_DATA)
-        # engine.searchByAttributes( line, response, SzEngineFlags.SZ_SEARCH_INCLUDE_FEATURE_SCORES | SzEngineFlags.SZ_ENTITY_INCLUDE_RECORD_DATA | SzEngineFlags.SZ_ENTITY_INCLUDE_REPRESENTATIVE_FEATURES )
         return (timer() - startTime, record["RECORD_ID"], response)
     except Exception as err:
         traceback.print_exc()
@@ -200,8 +129,6 @@ try:
         "semantic_search", engine_config, verbose_logging=args.debugTrace
     )
 
-    url = get_postgresql_url(engine_config)
-
     g2 = factory.create_engine()
     g2.prime_engine()
     max_workers = int(os.getenv("SENZING_THREADS_PER_PROCESS", 0))
@@ -225,7 +152,7 @@ try:
             print(f"Searching with {executor._max_workers} threads")
             try:
                 futures = {
-                    executor.submit(process_line, g2, line, url): line
+                    executor.submit(process_line, g2, line): line
                     for line in itertools.islice(fp, q_multiple * executor._max_workers)
                 }
 
@@ -269,7 +196,7 @@ try:
 
                         line = fp.readline()
                         if line:
-                            futures[executor.submit(process_line, g2, line, url)] = line
+                            futures[executor.submit(process_line, g2, line)] = line
 
                 print(
                     f"Processed total of {numLines} searches, entities returned {total_entities_returned}: avg[{timeTot/count:.3f}s] tps[{count/(time.time()-beginTime):.3f}/s] min[{timeMin:.3f}s] max[{timeMax:.3f}s]"
