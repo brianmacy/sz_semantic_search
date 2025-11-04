@@ -197,3 +197,4 @@ cython_debug/
 test_db/
 *.deb
 *.db
+test_icij.json
