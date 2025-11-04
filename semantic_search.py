@@ -136,7 +136,7 @@ try:
         max_workers = None
 
     g2Diagnostic = factory.create_diagnostic()
-    response = g2Diagnostic.check_datastore_performance(3)
+    response = g2Diagnostic.check_repository_performance(3)
     print(response)
 
     beginTime = prevTime = time.time()
