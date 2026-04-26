@@ -3,5 +3,5 @@ orjson==3.11.8
 sentence-transformers==5.4.1
 
 # Optional: PostgreSQL support (for setup_vector_tables.py)
-uritools==6.0.1
+uritools==6.0.2
 psycopg2==2.9.11
