@@ -1,5 +1,5 @@
 # Dependencies for sz_semantic_search
-orjson==3.11.8
+orjson==3.11.9
 sentence-transformers==5.4.1
 
 # Optional: PostgreSQL support (for setup_vector_tables.py)
