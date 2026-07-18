@@ -273,7 +273,7 @@ if __name__ == "__main__":
         else:
             # PostgreSQL mode (default)
             url = get_postgresql_url(engine_config)
-            print(f"Connecting to PostgreSQL database...")
+            print("Connecting to PostgreSQL database...")
             conn = psycopg2.connect(url)
             conn.autocommit = True
 

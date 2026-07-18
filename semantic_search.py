@@ -3,7 +3,6 @@
 import concurrent.futures
 
 import argparse
-import pathlib
 import orjson as json
 import itertools
 
@@ -15,7 +14,7 @@ from timeit import default_timer as timer
 import traceback
 
 import senzing_core
-from senzing import SzEngineFlags, SzError
+from senzing import SzEngineFlags
 
 from sentence_transformers import SentenceTransformer
 # from fast_sentence_transformers import FastSentenceTransformer as SentenceTransformer

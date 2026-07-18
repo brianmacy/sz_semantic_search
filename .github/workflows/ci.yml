@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint & Compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      # Note: requirements.txt (sentence-transformers/torch, psycopg2 source
+      # build) is intentionally NOT installed here. Ruff (lint) and compileall
+      # (syntax) are static checks that do not import these modules, so pulling
+      # in heavy/fragile runtime dependencies would only slow and destabilize
+      # the job without improving coverage.
+      - name: Install lint tools
+        run: pip install ruff
+      - name: Ruff lint
+        run: ruff check .
+      - name: Compile check (syntax)
+        run: python -m compileall -q .
