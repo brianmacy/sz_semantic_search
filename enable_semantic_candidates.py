@@ -97,8 +97,8 @@ def create_name_sem_key_feature(config_json):
 
     g2_config["CFG_FTYPE"].append(name_sem_key_ftype)
     print(f"✓ Created NAME_SEM_KEY feature type (FTYPE_ID: {new_ftype_id})")
-    print(f"  USED_FOR_CAND: Yes (candidates enabled)")
-    print(f"  SHOW_IN_MATCH_KEY: No (scoring disabled)")
+    print("  USED_FOR_CAND: Yes (candidates enabled)")
+    print("  SHOW_IN_MATCH_KEY: No (scoring disabled)")
 
     # Find SEMANTIC_VALUE attributes to copy
     semantic_attrs = []
@@ -228,7 +228,7 @@ def main():
         print("\nFeature configuration:")
         print("  - NAME_SEM_KEY: Candidates enabled, scoring disabled")
         print("  - SEMANTIC_VALUE: Original settings unchanged")
-        print(f"\nNote: Restart any running Sz processes to use the new configuration")
+        print("\nNote: Restart any running Sz processes to use the new configuration")
         print("\nIMPORTANT: This feature requires Senzing Advanced Search license")
 
     except Exception as ex:
