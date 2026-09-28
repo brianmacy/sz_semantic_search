@@ -103,7 +103,7 @@ export SENZING_ENGINE_CONFIGURATION_JSON='{
     "CONFIGPATH": "/etc/opt/senzing",
     "LICENSESTRINGBASE64": "YOUR_LICENSE_KEY",
     "RESOURCEPATH": "/opt/senzing/er/resources",
-    "SUPPORTPATH": "/opt/senzing/er/data"
+    "SUPPORTPATH": "/opt/senzing/data"
   },
   "SQL": {
     "CONNECTION": "postgresql://user:pass@localhost:5432/senzing"
