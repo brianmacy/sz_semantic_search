@@ -20,7 +20,7 @@ Instead of building forced candidate lists externally, this implementation uses 
    - **PostgreSQL** with pgvector extension, OR
    - **SQLite** with szvec extension (included in senzingsdk-runtime)
 
-3. **Python 3.10+** with dependencies:
+3. **Python 3.11+** with dependencies:
    ```bash
    pip install senzing senzing-core psycopg2-binary pgvector orjson \
                fast-sentence-transformers uritools
