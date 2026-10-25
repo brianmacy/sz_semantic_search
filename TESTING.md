@@ -4,7 +4,7 @@
 
 - [ ] Senzing SDK installed with Advanced Search license
 - [ ] Database configured (PostgreSQL with pgvector OR SQLite with szvec)
-- [ ] Python 3.10+ with required packages
+- [ ] Python 3.11+ with required packages
 - [ ] SENZING_ENGINE_CONFIGURATION_JSON environment variable set
 
 ## Phase 1: Environment Validation

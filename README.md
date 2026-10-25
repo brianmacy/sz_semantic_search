@@ -1,7 +1,7 @@
 # Semantic Search for Senzing Entity Resolution
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11+-green.svg)](https://www.python.org/)
 [![Senzing](https://img.shields.io/badge/Senzing-SDK%20v4-orange.svg)](https://senzing.com/)
 
 Enhance Senzing entity resolution with semantic similarity search using vector embeddings. This solution adds a NAME_SEM_KEY feature type that generates candidates based on semantic meaning, significantly improving recall for fuzzy name matches while maintaining precision.
@@ -62,7 +62,7 @@ Result: 40% better recall with maintained precision
 - **Senzing SDK v4** with Advanced Search license
   - `senzingsdk-runtime` (includes szvec extension)
   - `senzingsdk-tools` (includes sz_configtool)
-- **Python 3.10+**
+- **Python 3.11+**
 - **Database** (choose one):
   - PostgreSQL 12+ with pgvector extension, OR
   - SQLite 3.35+ (szvec included in senzingsdk-runtime)
